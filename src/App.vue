@@ -1,10 +1,16 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { gsap } from 'gsap'
-import dimensions from './assets/yuna-sora-dimensions.json'
 
 const columns = ref([])
 const active = ref(null)
+const ageGateOpen = ref(true)
+const ageRejected = ref(false)
+
+function confirmAge() {
+  localStorage.setItem('yuna-sora-age-confirmed', 'true')
+  ageGateOpen.value = false
+}
 
 function open(img) { active.value = img }
 function close() { active.value = null }
@@ -27,23 +33,30 @@ const onImgEnter = (el, done) =>
 const onLeave = (el, done) =>
   gsap.to(el, { opacity: 0, duration: 0.25, onComplete: done })
 const colCount = ref(4)
+const SHAPES = { tall: 1.6, square: 1, mid: 1.25 }
+const pattern = ['tall', 'square', 'mid', 'square', 'tall', 'tall', 'square', 'mid']
 
-const galleryImages = import.meta.glob('./assets/yuna-sora/*.png', {
+const galleryThumbs = import.meta.glob('./assets/yuna-sora-optimized/thumbs/*.webp', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
+const galleryFull = import.meta.glob('./assets/yuna-sora-optimized/full/*.webp', {
   eager: true,
   query: '?url',
   import: 'default',
 })
 
-const items = Object.entries(galleryImages)
+const items = Object.entries(galleryThumbs)
   .sort(([a], [b]) => a.localeCompare(b))
   .map(([path, src], i) => {
-  const size = dimensions[path.split('/').at(-1)]
-  const ratio = size.height / size.width
+  const shape = pattern[i % pattern.length]
+  const fullPath = `./assets/yuna-sora-optimized/full/${path.split('/').at(-1)}`
   return {
     id: i + 1,
-    ratio,
+    ratio: SHAPES[shape],
     src,
-    full: src,
+    full: galleryFull[fullPath],
     alt: `Иллюстрация Юны и Соры ${i + 1}`,
   }
 })
@@ -74,6 +87,7 @@ function onResize() {
 }
 
 onMounted(async () => {
+  ageGateOpen.value = localStorage.getItem('yuna-sora-age-confirmed') !== 'true'
   layout()
   await nextTick()
   gsap.from('.card', { opacity: 0, y: 40, duration: 0.7, ease: 'power2.out', stagger: 0.04 })
@@ -96,7 +110,7 @@ onBeforeUnmount(() => {
         :style="{ aspectRatio: '1 / ' + img.ratio }"
         @click="open(img)"
       >
-        <img :src="img.src" :alt="img.alt" draggable="false" />
+        <img :src="img.src" :alt="img.alt" loading="lazy" decoding="async" draggable="false" />
       </div>
     </div>
     <Transition :css="false" @enter="onEnter" @leave="onLeave">
@@ -111,13 +125,32 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
   </main>
+  <div v-if="ageGateOpen" class="age-overlay">
+    <section class="age-dialog" role="dialog" aria-modal="true" aria-labelledby="age-title">
+      <template v-if="!ageRejected">
+        <div class="age-badge">18+</div>
+        <h1 id="age-title">Контент для взрослых</h1>
+        <p>На сайте есть материалы, предназначенные только для совершеннолетних.</p>
+        <p>Подтвердите, что вам исполнилось 18 лет, чтобы продолжить.</p>
+        <div class="age-actions">
+          <button class="age-continue" @click="confirmAge">Мне есть 18 — продолжить</button>
+          <button class="age-leave" @click="ageRejected = true">Мне нет 18</button>
+        </div>
+      </template>
+      <template v-else>
+        <div class="age-badge">18+</div>
+        <h1 id="age-title">Доступ закрыт</h1>
+        <p>Этот сайт предназначен только для совершеннолетних.</p>
+      </template>
+    </section>
+  </div>
 </template>
 
 <style scoped>
 .wall {
   display: flex;
-  gap: 16px;
-  padding: 16px;
+  gap: 8px;
+  padding: 8px;
   align-items: flex-start;
 }
 .col {
@@ -125,18 +158,18 @@ onBeforeUnmount(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 .card {
   width: 100%;
   border-radius: 16px;
   overflow: hidden;
-  background: transparent;
+  background: #f5eaf1;
 }
 .card img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   transition: transform 0.4s;
 }
@@ -198,4 +231,49 @@ onBeforeUnmount(() => {
   opacity: 0.7;
 }
 .close:hover { background: rgba(255, 255, 255, 0.3); }
+.age-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 7, 12, 0.88);
+  backdrop-filter: blur(12px);
+}
+.age-dialog {
+  width: min(100%, 440px);
+  padding: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  background: #1b1720;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+.age-badge {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 20px;
+  border: 1px solid rgba(255, 171, 211, 0.45);
+  border-radius: 50%;
+  color: #ffabd3;
+  font-weight: 700;
+}
+.age-dialog h1 { margin-bottom: 14px; font-size: 24px; }
+.age-dialog p { margin: 0 0 10px; color: rgba(255, 255, 255, 0.72); line-height: 1.55; }
+.age-actions { display: grid; gap: 10px; margin-top: 24px; }
+.age-actions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.age-continue { background: #f49ac7; color: #24131d; font-weight: 700; }
+.age-continue:hover { background: #ffb5d9; }
+.age-leave { background: transparent; color: rgba(255, 255, 255, 0.72); }
+.age-leave:hover { background: rgba(255, 255, 255, 0.08); }
 </style>
