@@ -7,7 +7,17 @@ const active = ref(null)
 
 function open(img) { active.value = img }
 function close() { active.value = null }
-function onKey(e) { if (e.key === 'Escape') close() }
+function step(d) {
+  if (!active.value) return
+  const n = items.length
+  const i = items.findIndex(it => it.id === active.value.id)
+  active.value = items[(i + d + n) % n]
+}
+function onKey(e) {
+  if (e.key === 'Escape') close()
+  else if (e.key === 'ArrowRight') step(1)
+  else if (e.key === 'ArrowLeft') step(-1)
+}
 
 const onEnter = (el, done) =>
   gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3, onComplete: done })
@@ -90,9 +100,12 @@ onBeforeUnmount(() => {
     <Transition :css="false" @enter="onEnter" @leave="onLeave">
       <div v-if="active" class="lightbox" @click="close">
         <Transition :css="false" appear @enter="onImgEnter">
-          <img :src="active.full" :alt="'photo ' + active.id" />
+          <img :key="active.id" :src="active.full" :alt="'photo ' + active.id" />
         </Transition>
         <button class="close" aria-label="Закрыть" @click.stop="close">✕</button>
+        <button class="nav prev" aria-label="Назад" @click.stop="step(-1)">‹</button>
+        <button class="nav next" aria-label="Вперёд" @click.stop="step(1)">›</button>
+        <div class="counter">{{ active.id }} / {{ items.length }}</div>
       </div>
     </Transition>
   </main>
@@ -154,6 +167,33 @@ onBeforeUnmount(() => {
   color: #fff;
   font-size: 20px;
   cursor: pointer;
+}
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+  padding-bottom: 4px;
+  cursor: pointer;
+}
+.nav:hover { background: rgba(255, 255, 255, 0.3); }
+.prev { left: 24px; }
+.next { right: 24px; }
+.counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 14px;
+  opacity: 0.7;
 }
 .close:hover { background: rgba(255, 255, 255, 0.3); }
 </style>
