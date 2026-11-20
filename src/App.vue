@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { gsap } from 'gsap'
+import dimensions from './assets/yuna-sora-dimensions.json'
 
 const columns = ref([])
 const active = ref(null)
@@ -27,22 +28,23 @@ const onLeave = (el, done) =>
   gsap.to(el, { opacity: 0, duration: 0.25, onComplete: done })
 const colCount = ref(4)
 
-// соотношения высота/ширина: длинная (tall), квадратная (square), средняя
-const SHAPES = { tall: 1.6, square: 1, mid: 1.25 }
-// порядок форм — длинная, квадратная, и т.д.
-const pattern = ['tall', 'square', 'mid', 'square', 'tall', 'tall', 'square', 'mid']
+const galleryImages = import.meta.glob('./assets/yuna-sora/*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
 
-const items = Array.from({ length: 40 }, (_, i) => {
-  const shape = pattern[i % pattern.length]
-  const ratio = SHAPES[shape]
-  const w = 500
-  const h = Math.round(w * ratio)
+const items = Object.entries(galleryImages)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, src], i) => {
+  const size = dimensions[path.split('/').at(-1)]
+  const ratio = size.height / size.width
   return {
     id: i + 1,
-    shape,
     ratio,
-    src: `https://picsum.photos/seed/yuna${i + 1}/${w}/${h}`,
-    full: `https://picsum.photos/seed/yuna${i + 1}/1600/${Math.round(1600 * ratio)}`,
+    src,
+    full: src,
+    alt: `Иллюстрация Юны и Соры ${i + 1}`,
   }
 })
 
@@ -94,13 +96,13 @@ onBeforeUnmount(() => {
         :style="{ aspectRatio: '1 / ' + img.ratio }"
         @click="open(img)"
       >
-        <img :src="img.src" :alt="'photo ' + img.id" draggable="false" />
+        <img :src="img.src" :alt="img.alt" draggable="false" />
       </div>
     </div>
     <Transition :css="false" @enter="onEnter" @leave="onLeave">
       <div v-if="active" class="lightbox" @click="close">
         <Transition :css="false" appear @enter="onImgEnter">
-          <img :key="active.id" :src="active.full" :alt="'photo ' + active.id" />
+          <img :key="active.id" :src="active.full" :alt="active.alt" />
         </Transition>
         <button class="close" aria-label="Закрыть" @click.stop="close">✕</button>
         <button class="nav prev" aria-label="Назад" @click.stop="step(-1)">‹</button>
@@ -129,12 +131,12 @@ onBeforeUnmount(() => {
   width: 100%;
   border-radius: 16px;
   overflow: hidden;
-  background: #222;
+  background: transparent;
 }
 .card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   transition: transform 0.4s;
 }
